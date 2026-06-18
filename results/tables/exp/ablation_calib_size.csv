@@ -1,6 +1,0 @@
-timestamp,model,method,sparsity,pattern,calib_source,nsamples,seqlen,seed,achieved_sparsity,fisher_variant,fisher_active,wikitext2_ppl,c4_ppl,boolq,rte,hellaswag,winogrande,arc_easy,arc_challenge,openbookqa,zeroshot_avg,mmlu,extra_json
-2026-05-20T00:00:00Z,meta-llama/Llama-2-7b-hf,fwanda,0.5,unstructured,c4,32,2048,0,0.5,empirical,True,7.10,7.25,0.766,0.555,0.553,0.658,0.740,0.394,0.305,0.567,0.425,"{""source"":""fwanda_prediction""}"
-2026-05-20T00:00:00Z,meta-llama/Llama-2-7b-hf,fwanda,0.5,unstructured,c4,64,2048,0,0.5,empirical,True,6.95,7.10,0.770,0.560,0.558,0.661,0.744,0.399,0.308,0.571,0.430,"{""source"":""fwanda_prediction""}"
-2026-05-20T00:00:00Z,meta-llama/Llama-2-7b-hf,fwanda,0.5,unstructured,c4,128,2048,0,0.5,empirical,True,6.85,7.00,0.772,0.564,0.561,0.664,0.747,0.402,0.311,0.574,0.431,"{""source"":""fwanda_prediction""}"
-2026-05-20T00:00:00Z,meta-llama/Llama-2-7b-hf,fwanda,0.5,unstructured,c4,256,2048,0,0.5,empirical,True,6.84,6.98,0.773,0.564,0.562,0.665,0.748,0.404,0.312,0.575,0.432,"{""source"":""fwanda_prediction""}"
-2026-05-20T00:00:00Z,meta-llama/Llama-2-7b-hf,fwanda,0.5,unstructured,c4,512,2048,0,0.5,empirical,True,6.83,6.97,0.774,0.564,0.562,0.666,0.749,0.404,0.312,0.576,0.433,"{""source"":""fwanda_prediction""}"

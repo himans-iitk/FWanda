@@ -1,2 +1,0 @@
-timestamp,model,method,sparsity,pattern,calib_source,nsamples,seqlen,seed,achieved_sparsity,fisher_variant,fisher_active,wikitext2_ppl,c4_ppl,boolq,rte,hellaswag,winogrande,arc_easy,arc_challenge,openbookqa,zeroshot_avg,mmlu,extra_json
-2026-05-20T00:00:00Z,meta-llama/Llama-2-7b-hf,sparsegpt,0.5,unstructured,c4,128,2048,0,0.5,,,7.01,,,,,,,,,,,"{""source"":""sparsegpt_paper"",""gate"":""baseline_reproduction""}"

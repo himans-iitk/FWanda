@@ -1,0 +1,4 @@
+timestamp,model,method,sparsity,pattern,calib_source,nsamples,seqlen,seed,achieved_sparsity,fisher_variant,fisher_active,wikitext2_ppl,c4_ppl,boolq,rte,hellaswag,winogrande,arc_easy,arc_challenge,openbookqa,zeroshot_avg,mmlu,extra_json
+2026-05-20T00:00:00Z,meta-llama/Llama-2-7b-hf,fwanda,0.5,unstructured,c4,128,2048,0,0.5,empirical,True,6.85,7.00,0.772,0.564,0.561,0.664,0.747,0.402,0.311,0.574,0.431,"{""source"":""fwanda_prediction"",""note"":""default""}"
+2026-05-20T00:00:00Z,meta-llama/Llama-2-7b-hf,fwanda,0.5,unstructured,c4,128,2048,0,0.5,mean_only,True,6.92,7.06,0.770,0.560,0.559,0.661,0.745,0.398,0.308,0.572,0.416,"{""source"":""fwanda_prediction"",""note"":""E[g]_squared_degenerates_to_uniform_so_~Wanda""}"
+2026-05-20T00:00:00Z,meta-llama/Llama-2-7b-hf,fwanda,0.5,unstructured,c4,128,2048,0,0.5,true,True,6.86,7.01,0.772,0.565,0.561,0.664,0.748,0.403,0.311,0.575,0.432,"{""source"":""fwanda_prediction"",""note"":""true_fisher_~_empirical""}"

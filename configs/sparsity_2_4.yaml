@@ -1,0 +1,4 @@
+# 2:4 semi-structured sparsity (keep 2 of every 4 consecutive weights)
+# Effective density 50%; eligible for NVIDIA sparse-tensor-core speedup.
+sparsity: 0.5
+pattern: "2:4"

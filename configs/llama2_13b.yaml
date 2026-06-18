@@ -1,0 +1,17 @@
+# Primary model — LLaMA-2-13B
+model: meta-llama/Llama-2-13b-hf
+hidden_size: 5120
+torch_dtype: bfloat16
+use_flash: true
+
+calibration:
+  source: c4
+  n_samples: 128
+  seq_len: 2048
+  seed: 0
+
+eval:
+  ppl: true
+  zero_shot: true
+  mmlu: true
+  ppl_seq_len: 2048

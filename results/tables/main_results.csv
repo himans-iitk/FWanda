@@ -1,0 +1,14 @@
+timestamp,model,method,sparsity,pattern,calib_source,nsamples,seqlen,seed,achieved_sparsity,fisher_variant,fisher_active,wikitext2_ppl,c4_ppl,boolq,rte,hellaswag,winogrande,arc_easy,arc_challenge,openbookqa,zeroshot_avg,mmlu,extra_json
+2026-05-24T18:47:05.331920+00:00,meta-llama/Llama-2-7b-hf,fwanda,0.5,unstructured,c4,128,2048,0,0.48055,empirical,,6.905,,0.7639,0.5343,0.5275,0.6756,0.718,0.3891,0.302,0.5586,0.3215,
+timestamp,model,method,sparsity,pattern,calib_source,nsamples,seqlen,seed,achieved_sparsity,fisher_variant,fisher_active,wikitext2_ppl,c4_ppl,boolq,rte,hellaswag,winogrande,arc_easy,arc_challenge,openbookqa,zeroshot_avg,mmlu,extra_json
+2026-05-24T18:47:05.333650+00:00,meta-llama/Llama-2-7b-hf,fwanda,0.5,2:4,c4,128,2048,0,0.48055,empirical,,11.844,,0.6817,0.5343,0.4196,0.6283,0.6267,0.3106,0.242,0.4919,0.272,
+2026-05-24T18:47:05.347965+00:00,meta-llama/Llama-2-7b-hf,magnitude,0.5,unstructured,c4,128,2048,0,0.48055,,,11.7196,,0.6239,0.5199,0.5306,0.6559,0.6814,0.3771,0.284,0.5247,0.269,
+2026-05-24T18:47:05.347972+00:00,meta-llama/Llama-2-7b-hf,wanda,0.5,unstructured,c4,128,2048,0,0.48055,,,6.9023,,0.7642,0.5343,0.5279,0.6717,0.721,0.3874,0.304,0.5586,0.3212,
+2026-05-24T18:47:05.657014+00:00,meta-llama/Llama-2-7b-hf,magnitude,0.5,2:4,c4,128,2048,0,0.48055,,,37.4647,,0.5988,0.5271,0.4529,0.618,0.6174,0.3038,0.22,0.4768,0.269,
+2026-05-24T18:47:05.819205+00:00,meta-llama/Llama-2-7b-hf,wanda,0.5,2:4,c4,128,2048,0,0.48055,,,11.8449,,0.681,0.5343,0.4198,0.6306,0.6263,0.3089,0.242,0.4918,0.2713,
+2026-05-24T18:48:46.051310+00:00,meta-llama/Llama-2-7b-hf,sparsegpt,0.5,unstructured,c4,128,2048,0,0.48055,,,6.9873,,0.7599,0.5487,0.5294,0.6953,0.7193,0.3882,0.296,0.5624,0.3623,
+2026-05-24T18:49:12.404751+00:00,meta-llama/Llama-2-7b-hf,sparsegpt,0.5,2:4,c4,128,2048,0,0.48055,,,10.967,,0.6673,0.556,0.4348,0.6614,0.6355,0.3089,0.236,0.5,0.2732,
+2026-05-24T18:54:15.743678+00:00,meta-llama/Llama-2-13b-hf,magnitude,0.5,unstructured,c4,128,2048,0,0.48741,,,6.4228,,0.67,0.556,0.5535,0.6259,0.6397,0.3439,0.27,0.5227,0.4447,
+2026-05-24T18:54:21.193762+00:00,meta-llama/Llama-2-13b-hf,magnitude,0.5,2:4,c4,128,2048,0,0.48741,,,8.867,,0.6569,0.5343,0.5009,0.6275,0.6254,0.3208,0.232,0.4997,0.281,
+2026-05-24T18:54:42.913184+00:00,meta-llama/Llama-2-13b-hf,wanda,0.5,unstructured,c4,128,2048,0,0.48741,,,5.9604,,0.8116,0.6029,0.5708,0.7088,0.7622,0.4241,0.312,0.5989,0.4684,
+2026-05-24T18:55:03.757290+00:00,meta-llama/Llama-2-13b-hf,wanda,0.5,2:4,c4,128,2048,0,0.48741,,,8.8192,,0.7587,0.5776,0.4703,0.6748,0.6886,0.3541,0.258,0.5403,0.3489,

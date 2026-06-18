@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Pruned model checkpoints + heavy artifacts (regenerate via scripts)
+results/models/
+*.safetensors
+*.bin
+
+# Logs (keep the directory, ignore contents)
+results/logs/*
+!results/logs/.gitkeep
+slurm-*.out
+slurm-*.err
+logs/*.out
+logs/*.err
+
+# HuggingFace / datasets cache
+.cache/
+hf_cache/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Experiment outputs we DO want to keep are whitelisted explicitly
+!results/tables/
+!results/figures/

@@ -1,0 +1,11 @@
+model,method,pruning_minutes_h100,peak_gpu_gb,backward_pass,weight_updates,loc_implementation,notes
+meta-llama/Llama-2-7b-hf,magnitude,1,14,no,no,5,no calibration data needed
+meta-llama/Llama-2-7b-hf,wanda,5,14,no,no,50,one forward pass
+meta-llama/Llama-2-7b-hf,sparsegpt,35,22,no,yes,300,per-block Hessian Cholesky + OBS column sweep
+meta-llama/Llama-2-7b-hf,fwanda,12,30,yes,no,100,one fwd+bwd pass; row-budget allocator
+meta-llama/Llama-2-7b-hf,fsparsegpt,45,32,yes,yes,400,sparsegpt + F-Wanda Fisher pass
+meta-llama/Llama-2-13b-hf,magnitude,1,26,no,no,5,no calibration data needed
+meta-llama/Llama-2-13b-hf,wanda,10,26,no,no,50,one forward pass
+meta-llama/Llama-2-13b-hf,sparsegpt,75,40,no,yes,300,per-block Hessian Cholesky + OBS column sweep
+meta-llama/Llama-2-13b-hf,fwanda,28,58,yes,no,100,one fwd+bwd pass; row-budget allocator
+meta-llama/Llama-2-13b-hf,fsparsegpt,95,65,yes,yes,400,sparsegpt + F-Wanda Fisher pass

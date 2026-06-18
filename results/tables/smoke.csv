@@ -1,0 +1,7 @@
+timestamp,model,method,sparsity,pattern,calib_source,nsamples,seqlen,seed,achieved_sparsity,fisher_variant,fisher_active,wikitext2_ppl,c4_ppl,boolq,rte,hellaswag,winogrande,arc_easy,arc_challenge,openbookqa,zeroshot_avg,mmlu,extra_json
+2026-05-20T08:48:13.881127+00:00,JackFram/llama-68m,magnitude,0.5,unstructured,c4,4,256,0,0.13874,,,195.8913,,,,,,,,,,,
+2026-05-20T08:48:36.075926+00:00,JackFram/llama-68m,wanda,0.5,unstructured,c4,4,256,0,0.13874,,,135.7998,,,,,,,,,,,
+2026-05-24T19:11:47.263820+00:00,JackFram/llama-68m,magnitude,0.5,unstructured,c4,4,256,0,0.13874,,,,195.8913,,,,,,,,,,,
+2026-05-24T19:12:04.393714+00:00,JackFram/llama-68m,wanda,0.5,unstructured,c4,4,256,0,0.13874,,per_row,,135.7998,,,,,,,,,,,
+2026-05-24T19:12:20.906216+00:00,JackFram/llama-68m,fwanda,0.5,unstructured,c4,4,256,0,0.13874,empirical,global,,135.3543,,,,,,,,,,,
+2026-05-24T19:12:36.792607+00:00,JackFram/llama-68m,sparsegpt,0.5,unstructured,c4,4,256,0,0.13874,,,,191.7724,,,,,,,,,,,

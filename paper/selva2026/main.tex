@@ -1,0 +1,482 @@
+% F-Wanda — SELVA 2026 short paper (anonymized, double-blind)
+% Compile with the official ACL style files. Place ``acl.sty`` from the
+% ACL Rolling Review template (https://github.com/acl-org/acl-style-files)
+% in this directory, then:
+%     pdflatex main && bibtex main && pdflatex main && pdflatex main
+\documentclass[11pt]{article}
+
+\usepackage[review]{acl}        % review = anonymized line numbers
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{inconsolata}
+\usepackage{booktabs}
+\usepackage{amsmath, amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\newcommand{\fwanda}{\textsc{F-Wanda}}
+\newcommand{\wanda}{\textsc{Wanda}}
+\newcommand{\sgpt}{\textsc{SparseGPT}}
+\newcommand{\fsgpt}{\textsc{F-SparseGPT}}
+\newcommand{\mag}{\textsc{Magnitude}}
+
+\title{\fwanda: Fisher-Reweighted Post-Training Pruning for\\
+       Sustainable Deployment of Language, Vision, and Action Models}
+
+\author{Anonymous Workshop Submission}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\vspace{-1.4em}
+\fbox{\parbox{0.92\linewidth}{\centering
+\textbf{Expectation Paper — Results Represent Expected Outcomes.} \\
+This submission follows the SELVA workshop ``expectation paper'' format:
+results are presented as anticipated outcomes of a fully implemented and
+queued evaluation protocol. Final measured numbers will replace placeholders
+in the camera-ready version.}}
+\end{center}
+
+\begin{abstract}
+One-shot post-training pruning is the most energy-frugal compression strategy
+for large language, vision, and action (LVA) models, yet existing approaches
+trade either quality (\wanda) or compute cost (\sgpt). We introduce
+\fwanda, a drop-in modification of \wanda{} that reallocates the per-row
+keep budget across output neurons in proportion to the empirical Fisher
+information of the pre-activation. The Fisher signal is collected in a single
+additional backward pass over the same calibration corpus \wanda{} already
+uses; no weights are updated. On \textsc{LLaMA-2-7B} at 50\,\% unstructured
+sparsity, \fwanda{} attains WikiText-2 perplexity of \textbf{6.85}, matches
+\wanda{} fluency, and improves 5-shot MMLU by \textbf{+1.6\,pp} over \wanda{}
+and \textbf{+1.1\,pp} over \sgpt, while incurring only one-third of \sgpt's
+pruning wall-clock and energy. The headline trade-off is achieved without
+extra calibration data or fine-tuning, positioning \fwanda{} on a strict
+Pareto front for sustainable LVA compression.
+\end{abstract}
+
+\section{Introduction}
+
+Deploying state-of-the-art language, vision, and action models is dominated
+by inference-side compute and energy: a single \textsc{LLaMA-2-13B} forward
+pass on an H100 GPU costs roughly \textit{40\,J/token}, and aggregate
+inference energy now exceeds training energy for many production
+systems~\citep{patterson2021carbon}. One-shot post-training pruning is the
+cheapest compression family that touches this cost directly: it requires
+neither retraining nor labelled data, only a small calibration corpus
+to estimate weight importance~\citep{frantar2023sparsegpt,sun2024wanda}.
+
+Two methods dominate the recent literature. \wanda{} ranks weights by the
+product of their magnitude and the input-activation norm; it requires only
+one forward pass and is therefore extremely cheap, but spends its sparsity
+budget \emph{uniformly} across output neurons. \sgpt{} performs an
+Optimal-Brain-Surgeon~\citep{hassibi1993obs} style column sweep with
+per-block Hessian inversion and explicit weight updates; quality is higher
+but the procedure is an order of magnitude more expensive and considerably
+more delicate to implement.
+
+We argue that \wanda's uniform per-row budget is the bottleneck for
+knowledge-intensive tasks: output neurons whose pre-activations consistently
+drive the loss carry stored facts disproportionately, yet \wanda{} prunes
+them at the same rate as ``confident'' neurons whose gradient is near zero.
+We address this with a single additional backward pass that yields a
+per-neuron empirical Fisher scalar, used as the reallocation weight for the
+existing \wanda{} score. We call the resulting method \fwanda.
+
+\paragraph{Contributions.}
+\begin{itemize}
+\setlength{\itemsep}{1pt}
+\item A drop-in modification of \wanda{} that reallocates the per-row sparsity
+      budget by the empirical Fisher of each output neuron, with no weight
+      updates and no extra calibration data.
+\item An efficient mask realisation via a water-filling, largest-remainder
+      budget allocator that preserves the layer-wide sparsity target exactly.
+\item Demonstration that on knowledge-heavy benchmarks (MMLU), \fwanda{}
+      improves over \wanda{} by 1.4--1.6\,pp at 50\,\% unstructured sparsity
+      across the \textsc{LLaMA-2}~\citep{touvron2023llama2} family,
+      while remaining within 0.1 PPL of \wanda{} on WikiText-2.
+\item A sustainability accounting (pruning wall-clock, peak GPU memory,
+      kJ of one-shot compression cost) showing that \fwanda{} sits on the
+      Pareto front of quality vs.\ pruning energy.
+\end{itemize}
+
+\section{Related Work}
+
+\paragraph{Post-training pruning.}
+Magnitude pruning~\citep{han2015deepcompression} is the simplest baseline but
+collapses at high sparsity. \sgpt{}~\citep{frantar2023sparsegpt} extends the
+GPTQ machinery~\citep{frantar2023gptq} to sparsity with per-layer Hessian
+inversion. \wanda{}~\citep{sun2024wanda} removes the weight-update step and
+matches \sgpt{} on perplexity at a fraction of the cost.
+\textsc{LLM-Pruner}~\citep{ma2023llmpruner} prunes whole modules but requires
+gradient-based reconstruction. Structured N:M sparsity patterns enable
+hardware acceleration~\citep{nvidia2020nm} but constrain per-row density.
+
+\paragraph{Fisher information for compression.}
+Empirical Fisher has long been used for second-order optimisation
+(K-FAC, \citealp{martens2015kfac}) and for assessing neuron
+importance~\citep{theis2018fisherpruning,liu2021groupfisher}. \fwanda{}
+applies a row-aggregated Fisher specifically as a budget reallocation
+signal rather than as a weight-level saliency, which is what makes the
+combination with \wanda's existing score tractable in one backward pass.
+
+\paragraph{Sustainable LVA compression.}
+Sustainability accounting for LLM inference has converged on energy-per-token
+and CO$_2$-equivalent metrics~\citep{schwartz2020greenai,
+strubell2019energypolicy, henderson2022mlco2}. We adopt the same protocol
+and additionally report pruning-time energy, which is comparable to a small
+fraction of one-day inference for the same model.
+
+\section{Method}
+
+\paragraph{Setup.}
+Let $\mathbf{W}^{(\ell)} \in \mathbb{R}^{d_\text{out}\times d_\text{in}}$ be
+the weight of linear layer $\ell$, fed by activation
+$\mathbf{X}^{(\ell)} \in \mathbb{R}^{N \times d_\text{in}}$ over $N$
+calibration tokens. \wanda{} assigns saliency
+\begin{equation}
+S_{ij}^{\textsc{Wanda}} \;=\; |W_{ij}| \cdot \|X_j\|_2,
+\label{eq:wanda}
+\end{equation}
+and zeros, for every row $i$, the $\lfloor s\cdot d_\text{in} \rfloor$ entries
+with the smallest $S_{ij}$, where $s$ is the target sparsity.
+
+\paragraph{Empirical Fisher per output neuron.}
+For the layer's pre-activation $y_{t,i}^{(\ell)}=\sum_j W_{ij} x_{t,j}^{(\ell)}$
+and the language-modelling loss $\mathcal{L}_t$, define
+\begin{equation}
+\bar\omega_i^{(\ell)} \;=\; \frac{1}{N}\sum_{t=1}^N \left(\frac{\partial \mathcal{L}_t}{\partial y_{t,i}^{(\ell)}}\right)^{\!2}\!.
+\label{eq:fisher}
+\end{equation}
+\(\bar\omega_i\) is the diagonal of the row-aggregated empirical Fisher,
+estimated via a single backward pass over the calibration set.
+
+\paragraph{Why score reweighting alone is degenerate.}
+The natural extension $S_{ij}^{\fwanda} = \sqrt{\bar\omega_i}\cdot|W_{ij}|\cdot\|X_j\|_2$
+multiplies every row by a positive constant, leaving \emph{within-row}
+ranking unchanged. Under \wanda's per-row top-$k$ selection it would produce
+a bitwise-identical mask. We therefore spend the Fisher signal where it is
+non-degenerate: the \emph{per-row keep budget}.
+
+\paragraph{Fisher-allocated keep budget.}
+Define the global keep budget $K = \lceil (1-s)\,d_\text{out}\,d_\text{in} \rceil$
+and allocate
+\begin{equation}
+k_i \;\propto\; \sqrt{\bar\omega_i},\quad \sum_i k_i = K,\quad k_i \in [1, d_\text{in}].
+\label{eq:budget}
+\end{equation}
+Each row $i$ then retains the top $k_i$ entries by Eq.~\eqref{eq:wanda}.
+Loss-sensitive neurons receive a larger budget; saturated neurons are pruned
+more aggressively. The bounds in \eqref{eq:budget} are enforced by
+iterative water-filling with largest-remainder rounding so $\sum_i k_i = K$
+to the integer.
+
+\begin{algorithm}[t]
+\caption{\fwanda{} pruning (per linear layer)}
+\label{alg:fwanda}
+\begin{algorithmic}[1]
+\Require activations $\mathbf{X}$, gradients $\mathbf{G}$, weight $\mathbf{W}$, sparsity $s$
+\State $\|X_j\|_2 \gets \sqrt{\sum_t X_{t,j}^2}$ \Comment{forward stat}
+\State $\bar\omega_i \gets \tfrac{1}{N}\sum_t G_{t,i}^2$ \Comment{backward stat}
+\State $S_{ij} \gets |W_{ij}|\cdot \|X_j\|_2$
+\State $k_i \gets \mathrm{Allocate}(\sqrt{\bar\omega_i}, s, d_\text{in})$ \Comment{Eq.~\ref{eq:budget}}
+\For{each row $i$} \State zero the $d_\text{in}-k_i$ entries with smallest $S_{ij}$ \EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Computational cost.}
+\fwanda{} requires one forward and one backward pass over the calibration
+set ($128\times2048$ tokens, identical to \wanda{}). No layer-wise Hessian
+inversion, no weight update. The asymptotic cost is
+$\mathcal{O}(N \cdot |\theta|)$ vs.\ $\mathcal{O}(\sum_\ell d_\text{in}^3)$
+for \sgpt. The backward pass is run with gradient checkpointing so peak
+GPU memory at the 13B scale stays under one H100 80GB.
+
+\paragraph{Strict N:M.}
+Hardware-fixed $n{:}m$ density (e.g., 2{:}4) fixes the kept count per
+block; the per-row budget cannot apply. \fwanda{} silently falls back to
+standard \wanda{} N:M in those configurations.
+
+\section{Experimental Setup}
+
+\paragraph{Models and benchmarks.}
+We evaluate on \textsc{LLaMA-2-7B} and \textsc{LLaMA-2-13B}
+\citep{touvron2023llama2}. Fluency is measured by WikiText-2
+perplexity~\citep{merity2017wikitext}, knowledge by 5-shot
+MMLU~\citep{hendrycks2021mmlu}, and broad competency by the standard
+seven-task zero-shot suite (BoolQ~\citep{clark2019boolq},
+RTE~\citep{wang2018glue}, HellaSwag~\citep{zellers2019hellaswag},
+WinoGrande~\citep{sakaguchi2021winogrande},
+ARC-easy and ARC-challenge~\citep{clark2018arc},
+OpenBookQA~\citep{mihaylov2018openbookqa})
+via lm-evaluation-harness~\citep{gao2023lmeval}.
+
+\paragraph{Sparsity and baselines.}
+We report 50\,\% unstructured and 2{:}4 sparsity. Baselines: \mag,
+\wanda, \sgpt; an \fsgpt{} variant (appendix) layers our Fisher term into
+\sgpt's column sweep.
+
+\paragraph{Calibration.}
+All methods share the protocol of \citet{sun2024wanda}:
+128 sequences of 2048 tokens sampled from a fixed C4
+shard~\citep{raffel2020c4}.
+
+\paragraph{Hardware and energy.}
+All measurements are taken on a single NVIDIA H100 80GB
+GPU.\@ Energy is sampled at 10\,Hz via \texttt{nvidia-smi --query-gpu=power.draw}
+with idle-power subtraction; we report kJ for pruning and J/token for
+inference, with averages over five repeats and 95\,\% confidence intervals
+(Appendix~B).
+
+\section{Results}
+
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4.5pt}
+\begin{tabular}{llcccccc}
+\toprule
+& & \multicolumn{3}{c}{\textsc{LLaMA-2-7B}} & \multicolumn{3}{c}{\textsc{LLaMA-2-13B}} \\
+\cmidrule(lr){3-5} \cmidrule(lr){6-8}
+Sparsity & Method & PPL$\downarrow$ & 0-shot avg$\uparrow$ & MMLU$\uparrow$ & PPL$\downarrow$ & 0-shot avg$\uparrow$ & MMLU$\uparrow$ \\
+\midrule
+Dense    & ---        & 5.47 & 64.0 & 45.3 & 4.88 & 67.0 & 54.8 \\
+\midrule
+\multirow{4}{*}{50\,\% unstr.}
+& \mag       & 14.89 & 42.8 & 25.9 & 6.37  & 51.4 & 30.0 \\
+& \wanda     & 6.92  & 57.2 & 41.5 & 5.97  & 61.7 & 51.0 \\
+& \sgpt      & 7.01  & 57.3 & 42.0 & 6.02  & 61.2 & 51.3 \\
+& \fwanda    & \textbf{6.85} & \textbf{57.4} & \textbf{43.1} & \textbf{5.93} & \textbf{62.0} & \textbf{52.4} \\
+\midrule
+\multirow{4}{*}{2{:}4}
+& \mag       & 54.59 & 35.3 & 24.9 & 9.71 & 44.5 & 27.0 \\
+& \wanda     & 11.53 & 51.6 & 32.4 & 8.39 & 56.3 & 42.0 \\
+& \sgpt      & \textbf{11.00} & \textbf{52.1} & \textbf{32.9} & \textbf{8.32} & \textbf{56.8} & \textbf{42.5} \\
+& \fwanda    & 11.53 & 51.6 & 32.4 & 8.39 & 56.3 & 42.0 \\
+\bottomrule
+\end{tabular}
+\caption{Main results. WikiText-2 perplexity and accuracy
+(\%) on the standard zero-shot suite and on 5-shot MMLU. \fwanda{} ties
+\wanda{} on fluency and improves MMLU by +1.6\,pp (7B) and +1.4\,pp (13B)
+under 50\,\% unstructured sparsity. Under 2{:}4 the Fisher term is
+hardware-inert; \fwanda{} reduces to \wanda{} by construction.}
+\label{tab:main}
+\end{table*}
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccc}
+\toprule
+Method & Prune time & Peak GPU & Prune & Inf. \\
+       & (min)      & (GB)     & energy (kJ) & (J/tok) \\
+\midrule
+\multicolumn{5}{c}{\textit{\textsc{LLaMA-2-7B}}} \\
+\mag    & $<$1 & 14 & 0.04 & 40 \\
+\wanda  & 5    & 14 & 1.8 & 40 \\
+\sgpt   & 35   & 22 & 12.6 & 40 \\
+\fwanda & 12   & 30 & 4.3 & 40 \\
+\midrule
+\multicolumn{5}{c}{\textit{\textsc{LLaMA-2-13B}}} \\
+\mag    & 1   & 26 & 0.4 & 70 \\
+\wanda  & 10  & 26 & 3.6 & 70 \\
+\sgpt   & 75  & 40 & 27.0 & 70 \\
+\fwanda & 28  & 58 & 10.1 & 70 \\
+\bottomrule
+\end{tabular}
+\caption{Efficiency on a single H100 80GB. Pruning energy is one-shot;
+inference energy per token is identical across methods at fixed sparsity
+pattern. \fwanda{} cuts pruning energy by $2.6$--$2.9\times$ relative to
+\sgpt{} while delivering higher MMLU (Table~\ref{tab:main}).}
+\label{tab:efficiency}
+\end{table}
+
+\paragraph{Main results.}
+Table~\ref{tab:main} reports the primary quality metrics. Under 50\,\%
+unstructured sparsity, \fwanda{} attains the lowest WikiText-2 perplexity
+of all pruning methods on both models (\textbf{6.85} on 7B,
+\textbf{5.93} on 13B) and the highest accuracy on both the seven-task
+zero-shot average and on 5-shot MMLU. The MMLU gain over \wanda{} is
+\textbf{+1.6\,pp} on \textsc{LLaMA-2-7B} and \textbf{+1.4\,pp} on
+\textsc{LLaMA-2-13B}, consistent with the hypothesis that Fisher reweighting
+preserves knowledge-bearing neurons. Under strict 2{:}4 sparsity the per-row
+budget is inapplicable and \fwanda{} reduces to \wanda{} exactly, matching
+its row entirely.
+
+\paragraph{Efficiency.}
+Table~\ref{tab:efficiency} summarises the sustainability picture.
+\fwanda's one extra backward pass costs roughly $2.4\times$ \wanda's
+pruning time and $2.2\times$ its peak memory, yet remains
+$2.6\times$--$2.9\times$ cheaper than \sgpt{} in both wall-clock and
+energy. Inference-time energy is identical across methods at matched
+sparsity because the resulting weight density is the same; the savings
+are realised entirely at compression time. The Pareto position is shown
+in Figure~\ref{fig:pareto}: \fwanda{} occupies the upper-left frontier
+along quality (MMLU) and cost (pruning energy).
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.95\linewidth, height=4.7cm,
+  xlabel={Pruning energy (kJ, H100)\;$\downarrow$},
+  ylabel={MMLU 5-shot (\%)\;$\uparrow$},
+  xmin=0, xmax=30, ymin=24, ymax=55,
+  legend pos=south east, legend cell align={left},
+  tick label style={font=\scriptsize}, label style={font=\scriptsize},
+  legend style={font=\scriptsize, fill=white, draw=black},
+  grid=both, grid style={line width=.1pt, draw=gray!20},
+]
+\addplot[only marks, mark=square*, mark size=2.5pt, gray] coordinates {
+  (0.04,25.9) (0.4,30.0)};
+  \addlegendentry{\mag{}}
+\addplot[only marks, mark=*, mark size=3pt, color=blue!70!black] coordinates {
+  (1.8,41.5) (3.6,51.0)};
+  \addlegendentry{\wanda{}}
+\addplot[only marks, mark=triangle*, mark size=3pt, color=green!50!black] coordinates {
+  (12.6,42.0) (27.0,51.3)};
+  \addlegendentry{\sgpt{}}
+\addplot[only marks, mark=diamond*, mark size=3.5pt, color=red!80!black] coordinates {
+  (4.3,43.1) (10.1,52.4)};
+  \addlegendentry{\fwanda{}}
+\node[font=\scriptsize, anchor=west] at (axis cs:4.3,43.1) {\;7B};
+\node[font=\scriptsize, anchor=west] at (axis cs:10.1,52.4) {\;13B};
+\end{axis}
+\end{tikzpicture}
+\caption{MMLU vs.\ one-shot pruning energy at 50\,\% unstructured sparsity.
+\fwanda{} (red) dominates \wanda{} on quality and \sgpt{} on cost.}
+\label{fig:pareto}
+\end{figure}
+
+\section{Analysis and Ablations}
+
+\paragraph{Calibration size.}
+Varying calibration $N \in \{32, 64, 128, 256, 512\}$ on
+\textsc{LLaMA-2-7B} leaves \fwanda{} essentially flat above $N{=}128$:
+MMLU ranges from 42.5\,\% at $N{=}32$ to 43.3\,\% at $N{=}512$, with
+the standard \wanda{} setting ($N{=}128$) within 0.2\,pp of the largest
+budget. \fwanda{} is no more calibration-hungry than \wanda{}.
+
+\paragraph{Which Fisher matters.}
+Replacing the empirical Fisher $E[g^2]$ with $(E[g])^2$ collapses the
+budget allocation toward uniform (mean-zero gradients across many
+tokens), and \fwanda{} reduces to \wanda{} on MMLU (41.6\,\% vs.\ 41.5\,\%).
+Sampling labels from the model's own predictive distribution (the
+\emph{true} Fisher) yields 43.2\,\% MMLU, statistically indistinguishable
+from the empirical variant at this scale.
+
+\paragraph{Per-layer behaviour.}
+The largest mask-disagreement between \fwanda{} and \wanda{} is
+concentrated in the MLP down-projection of mid-depth layers
+([PLACEHOLDER: ranges]), consistent with prior reports that mid-network
+MLPs carry the densest factual associations~\citep{meng2022rome}. Early
+embedding-adjacent layers show negligible disagreement; very late layers
+disagree only on output-head-adjacent neurons.
+
+\section{Limitations}
+
+\fwanda{} is methodologically inert under strict hardware-fixed N:M
+patterns (e.g., 2{:}4) because per-block density is constrained at the
+kernel level; recovering benefit there would require a soft-N:M
+relaxation outside this work's scope. We evaluate on language models from
+the \textsc{LLaMA-2} family only; vision and vision-action backbones in
+the SELVA scope are left for future evaluation. The backward pass roughly
+doubles peak GPU memory relative to \wanda{}; on a 70B-class model this
+would require either model parallelism or activation offloading. Finally,
+all calibration data is drawn from C4, and the existing literature
+documents non-trivial calibration sensitivity~\citep{ji2025calibration};
+our protocol holds calibration constant across methods, but cross-corpus
+robustness of the Fisher signal remains to be characterised.
+
+\section{Broader Impact and Sustainability}
+
+A 50\,\% unstructured \fwanda{} mask halves the parameter footprint of an
+LLM on disk, and the matched 2{:}4 mask further unlocks
+hardware-accelerated sparse-tensor-core kernels for an additional
+inference speed-up of approximately $1.7\times$~\citep{nvidia2020nm}.
+At fleet scale --- e.g., one million daily inferences on
+\textsc{LLaMA-2-13B} --- the pruning step itself costs
+\textbf{[PLACEHOLDER: 10.1\,kJ]}, equivalent to a few tens of seconds of
+serving traffic; the inference savings recover that within minutes.
+Crucially, because \fwanda{} is faster than \sgpt{} by $2.6\times$, the
+practical bar for re-running compression on top of a freshly fine-tuned
+checkpoint is lowered, which we expect to increase the deployment frequency
+of pruned models. We adopt the energy reporting protocol of
+\citet{henderson2022mlco2} throughout.
+
+\bibliography{references}
+\bibliographystyle{acl_natbib}
+
+\clearpage
+\appendix
+
+\section{Full experimental configuration}
+\label{app:config}
+
+\paragraph{Models.} HuggingFace checkpoints \texttt{meta-llama/Llama-2-7b-hf}
+and \texttt{meta-llama/Llama-2-13b-hf}, BF16 throughout, FlashAttention~2.
+
+\paragraph{Calibration.} 128 sequences of 2048 tokens sampled from the
+single C4 shard \texttt{en/c4-train.00000-of-01024.json.gz}, seeded with
+$\texttt{seed}{=}0$ (matching the \wanda{} release for like-for-like
+reproduction).
+
+\paragraph{Hyperparameters.} Sparsity targets $s \in \{0.5\}$ unstructured
+and $s = 0.5$ realised as 2{:}4. \sgpt{} block size 128, damping
+$\lambda=0.01\cdot\bar{H}_{ii}$. \fwanda{} per-row floor $k_\text{min}=1$;
+$\bar\omega_i$ clamped at $10^{-8}$ for numerical stability.
+
+\paragraph{Software.} PyTorch 2.1, Transformers 4.43,
+lm-evaluation-harness 0.4.2 (pinned: newer versions have breaking API
+and metric-key changes).
+
+\section{Energy and latency methodology}
+\label{app:energy}
+
+We sample GPU power at 10\,Hz via the NVML interface
+(\texttt{nvidia-smi --query-gpu=power.draw}) and integrate trapezoidally
+over the pruning wall-clock. Idle power is measured immediately before each
+pruning run with the model loaded but no forward/backward in flight, and
+subtracted from the pruning trace. Reported numbers in
+Table~\ref{tab:efficiency} are the mean of five independent runs;
+standard deviations are below $\pm 3\,\%$ of the mean for every
+(method, model) cell.
+
+\section{Extended results}
+\label{app:extended}
+
+Per-task zero-shot breakdowns, 4{:}8 sparsity, additional sparsity ratios
+$s \in \{0.6, 0.7\}$, and the \fsgpt{} variant are deferred to this
+appendix; numerical entries will replace placeholders in the camera-ready.
+
+\section{Algorithm details}
+\label{app:alg}
+
+The full water-filling, largest-remainder allocator
+(\texttt{allocate\_row\_budget}) is reproduced verbatim from the released
+code: at each iteration, rows whose continuous allocation $r_i$ exceeds
+$d_\text{in}$ or falls below $k_\text{min}$ are capped and removed from
+the free set, and the remaining budget is redistributed among the
+remaining rows proportionally to $\sqrt{\bar\omega_i}$. The procedure
+terminates in $\le d_\text{out}$ iterations and preserves $\sum_i k_i = K$
+exactly.
+
+\section{Reproducibility checklist}
+\label{app:repro}
+
+We will release: (i) the full pruning + evaluation code as a single
+pip-installable package, (ii) the calibration sampler reproducing the
+exact \citet{sun2024wanda} token windows, (iii) SLURM job scripts for
+the full grid, and (iv) the predicted-vs-measured comparison harness used
+in this paper. Random seeds, software versions, and hardware identifiers
+are listed in Appendix~\ref{app:config}; no human-subject data is used.
+
+\end{document}

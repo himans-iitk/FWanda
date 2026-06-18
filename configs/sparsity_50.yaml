@@ -1,0 +1,3 @@
+# 50% unstructured sparsity (primary setting)
+sparsity: 0.5
+pattern: unstructured

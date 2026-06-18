@@ -1,0 +1,18 @@
+# Tiny LLaMA-architecture model for fast, GPU-light smoke testing of the
+# full pruning + eval pipeline. NOT a paper config.
+model: JackFram/llama-68m
+hidden_size: 768
+torch_dtype: float32
+use_flash: false
+
+calibration:
+  source: c4
+  n_samples: 4
+  seq_len: 256
+  seed: 0
+
+eval:
+  ppl: true
+  zero_shot: false
+  mmlu: false
+  ppl_seq_len: 256
